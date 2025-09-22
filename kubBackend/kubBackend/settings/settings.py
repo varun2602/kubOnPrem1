@@ -11,9 +11,22 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
+from dotenv import load_dotenv
 import os
+
+load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Pull the SECRET_KEY from the environment
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+# Set DEBUG to False unless explicitly set to "True" in the environment
+# DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+
+# Important for security when running on HTTPS
+CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost").split(",")
 
 
 # Quick-start development settings - unsuitable for production
@@ -40,6 +53,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'django_redis_sentinel',
     'api'
 ]
 
@@ -78,32 +92,16 @@ TEMPLATES = [
 WSGI_APPLICATION = 'kubBackend.wsgi.application'
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
-
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'kubdb',        # database name
-        'USER': 'postgres',      # username
-        'PASSWORD': '1',  # password
-        'HOST': 'postgres',   # or IP if remote
-        'PORT': '5432',        # default PostgreSQL port
+        'NAME': 'kubdb',     
+        'USER': 'postgres',     
+        'PASSWORD': '1', 
+        'HOST': 'postgres', 
+        'PORT': '5432', 
     }
 }
-
-
-
-# Password validation
-# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -138,6 +136,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
@@ -147,7 +146,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1")
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://redis:6379/1",  # "1" is Redis DB number
+        "LOCATION": REDIS_URL,  # "1" is Redis DB number
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }

@@ -10,19 +10,22 @@ services:
       POSTGRES_PASSWORD: 1
     ports:
       - "5432:5432"
+    networks:
+      - kubBackend
 
-  redis:
-    image: redis:latest
-    container_name: redis_container
-    ports:
-      - "6379:6379"
+  # redis:
+  #   image: redis:latest
+  #   container_name: redis_container
+  #   ports:
+  #     - "6379:6379"
 
   django:
     build: ./kubBackend
     container_name: django_container
     depends_on:
       - postgres
-      - redis
+      - sentinel1
+      # - sentinel2
     environment:
       - DATABASE_HOST=postgres
       - DATABASE_NAME=kubdb
@@ -30,6 +33,8 @@ services:
       - DATABASE_PASSWORD="1"
     ports:
       - "8000:8000"
+    networks:
+      - kubBackend
 
   frontend:
     build: ./my-app
@@ -40,5 +45,51 @@ services:
       - REACT_APP_API_URL=http://django:8000
     depends_on:
       - django
+    networks:
+      - kubBackend
+  redis-master:
+    image: redis:4.0.11-alpine
+    volumes:
+      - broker-data:/data
+    networks:
+      - kubBackend
+      
+  redis-slave:
+    image: redis:4.0.11-alpine
+    command: redis-server --port 6380 --slaveof redis-master 6379
+    volumes:
+      - broker-data:/data
+    networks:
+      - kubBackend
+    depends_on: 
+      - redis-master
+  sentinel1:
+      image: redis:4.0.11-alpine
+      command: sh /sentinel/run_sentinel.sh sentinel1
+      networks: 
+        - kubBackend
+      volumes:
+        - broker-data:/data
+        - ./kubBackend/sentinel:/sentinel
+      depends_on: 
+        - redis-master
+        - redis-slave
+      
+  # sentinel2:
+  #   image: redis:4.0.11-alpine
+  #   command: sh /sentinel/run_sentinel.sh sentinel2
+  #   networks: 
+  #     - redis
+  #   volumes:
+  #     - broker-data:/data
+  #     - ./sentinel:/sentinel
+  #   depends_on: 
+  #     - redis-master
+  #     - redis-slave
+
+networks:
+  kubBackend:
+  
 volumes:
+  broker-data:
   postgres_data:

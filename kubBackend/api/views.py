@@ -1,18 +1,19 @@
 from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.generics import ListCreateAPIView, ListAPIView
+# from django_redis_sentinel import BaseCache
 from django.core.cache import cache
+# from django_redis.cache import BaseCache
 from rest_framework.status import *
 from . import models 
 from . import serializer
-
+# base_cache_instance = BaseCache(params={"TIMEOUT":300})
 
 class StudentListCreate(ListCreateAPIView):
     queryset = models.Student.objects.all()
     serializer_class = serializer.StudentSerializer 
-
     def post(self, request, *args, **kwargs):
-        print("req_debug", request.data)
+        # base_cache_instance.set(key="req_debug_cache", value=request.data)
         cache.set("req_debug_cache", request.data)
         serialized = self.serializer_class(data = request.data)
         if serialized.is_valid():
@@ -28,5 +29,4 @@ class GetRedisData(ListAPIView):
             return Response({}, status=HTTP_200_OK)
         cache.delete("req_debug_cache")
         return Response({"req_debug_cache":value})
-    
-        
+ 
