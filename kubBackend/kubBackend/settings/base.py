@@ -3,7 +3,7 @@ from datetime import timedelta
 from dotenv import load_dotenv
 import os
 from redis.sentinel import Sentinel
-from django_redis.client import DefaultClient
+# from django_redis.client import DefaultClient
 
 
 load_dotenv()
@@ -31,6 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -55,7 +56,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'corsheaders.middleware.CorsMiddleware'
 ]
-# CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = True
 # LANGUAGE_CODE = 'en-us'
 # TIME_ZONE = 'Asia/Dhaka'
 # USE_I18N = True
@@ -105,22 +106,38 @@ SENTINELS = [
 ]
 
 sentinel = Sentinel(SENTINELS, socket_timeout=0.1)
-# redis_master = sentinel.master_for('cluster1', socket_timeout=0.1)
 DJANGO_REDIS_CONNECTION_FACTORY = 'django_redis.pool.SentinelConnectionFactory'
-
-# The correct way to configure Redis Sentinel with django-redis.
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://cluster1/0",  # Placeholder for Sentinel connection. It's not a real address.
+        "LOCATION": "redis://cluster1/0",  
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.SentinelClient",
-            "MASTER_NAME": "cluster1",  # This must match your sentinel.conf
+            "MASTER_NAME": "cluster1", 
             "SENTINELS": SENTINELS,
-            # If your master is password-protected, add the password here.
-            "SENTINEL_PASSWORD": None,
+            "SENTINEL_PASSWORD": None
         }
     }
+}
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                {
+                    "sentinels": [
+                        ("sentinel1", 26379),
+                        ("sentinel2", 26379),
+                    ],
+                    "master_name": "cluster1", 
+                    "password": None, 
+                    "db": 0, 
+                }
+            ],
+        },
+    },
 }
 
 ROOT_URLCONF = 'kubBackend.urls'

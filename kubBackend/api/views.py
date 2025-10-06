@@ -7,13 +7,11 @@ from django.core.cache import cache
 from rest_framework.status import *
 from . import models 
 from . import serializer
-# base_cache_instance = BaseCache(params={"TIMEOUT":300})
 
 class StudentListCreate(ListCreateAPIView):
     queryset = models.Student.objects.all()
     serializer_class = serializer.StudentSerializer 
     def post(self, request, *args, **kwargs):
-        # base_cache_instance.set(key="req_debug_cache", value=request.data)
         cache.set("req_debug_cache", request.data)
         serialized = self.serializer_class(data = request.data)
         if serialized.is_valid():

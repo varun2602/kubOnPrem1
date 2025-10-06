@@ -13,14 +13,10 @@ services:
     networks:
       - kubBackend
 
-  # redis:
-  #   image: redis:latest
-  #   container_name: redis_container
-  #   ports:
-  #     - "6379:6379"
-
   django:
-    build: ./kubBackend
+    build:
+      context: .
+      dockerfile: ./kubBackend/dockerfiles/dockerfile_for_rest/dockerfile
     container_name: django_container
     depends_on:
       - postgres
@@ -33,6 +29,28 @@ services:
       - DATABASE_PASSWORD="1"
     ports:
       - "8000:8000"
+      # - "8001:8001"
+    networks:
+      - kubBackend
+  
+  django-websockets:
+    build: 
+      context: .
+      dockerfile: ./kubBackend/dockerfiles/dockerfile_for_sockets/dockerfile
+    # dockerfile: ./kubBackend/dockerfiles/dockerfile_for_sockets/dockerfile
+    container_name: django_container_sockets
+    depends_on:
+      - postgres
+      - sentinel1
+      # - sentinel2
+    environment:
+      - DATABASE_HOST=postgres
+      - DATABASE_NAME=kubdb
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD="1"
+    ports:
+      # - "8000:8000"
+      - "8001:8001"
     networks:
       - kubBackend
 
@@ -48,44 +66,57 @@ services:
     networks:
       - kubBackend
   redis-master:
-    image: redis:4.0.11-alpine
+    image: redis:7.2
+    container_name: redis-master
     volumes:
       - broker-data:/data
     networks:
       - kubBackend
+    ports:
+     - "6379:6379"
       
   redis-slave:
-    image: redis:4.0.11-alpine
+    image: redis:7.2
     command: redis-server --port 6380 --slaveof redis-master 6379
     volumes:
       - broker-data:/data
     networks:
       - kubBackend
+    ports:
+     - "6380:6380"
     depends_on: 
       - redis-master
   sentinel1:
-      image: redis:4.0.11-alpine
-      command: sh /sentinel/run_sentinel.sh sentinel1
-      networks: 
-        - kubBackend
-      volumes:
-        - broker-data:/data
-        - ./kubBackend/sentinel:/sentinel
-      depends_on: 
-        - redis-master
-        - redis-slave
+    image: redis:7.2
+    # CRITICAL FIX: Inline command uses 'redis-master' as the hostname.
+    # We use redis-sentinel binary directly to prevent loading an external config file.
+    command: sh -c "sleep 5 && redis-sentinel --protected-mode no --sentinel monitor master-cluster redis-master 6379 2"
+    ports:
+      - "26379:26379"
+    networks: 
+      - kubBackend
+    volumes:
+      # CRITICAL FIX: Removed the mount to ./kubBackend/sentinel to eliminate the bad config file.
+      - broker-data:/data
+    depends_on: 
+      - redis-master
+      - redis-slave
       
-  # sentinel2:
-  #   image: redis:4.0.11-alpine
-  #   command: sh /sentinel/run_sentinel.sh sentinel2
-  #   networks: 
-  #     - redis
-  #   volumes:
-  #     - broker-data:/data
-  #     - ./sentinel:/sentinel
-  #   depends_on: 
-  #     - redis-master
-  #     - redis-slave
+  sentinel2:
+    image: redis:7.2
+    # CRITICAL FIX: Inline command uses 'redis-master' as the hostname.
+    # We use redis-sentinel binary directly to prevent loading an external config file.
+    command: sh -c "sleep 5 && redis-sentinel --protected-mode no --sentinel monitor master-cluster redis-master 6379 2"
+    ports:
+      - "26380:26380"
+    networks: 
+      - kubBackend
+    volumes:
+      # CRITICAL FIX: Removed the mount to ./kubBackend/sentinel to eliminate the bad config file.
+      - broker-data:/data
+    depends_on: 
+      - redis-master
+      - redis-slave
 
 networks:
   kubBackend:
