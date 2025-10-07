@@ -7,14 +7,13 @@ from redis.sentinel import Sentinel
 
 
 load_dotenv()
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-# Pull the SECRET_KEY from the environment
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(',')
 CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost").split(',')
+REDIS_SENTINEL_MASTER_NAME = os.getenv("REDIS_MASTER_NAME_FOR_SENTINEL")
 LANGUAGE_CODE = 'en-us'
-
+REDIS_MASTER_CONTAINER_NAME = os.getenv("REDIS_MASTER_CONTAINER_NAME")
 TIME_ZONE = 'UTC'
 
 USE_I18N = True
@@ -102,7 +101,8 @@ TEMPLATES = [
 
 SENTINELS = [
     ('sentinel1', 26379),
-    ('sentinel2', 26379),
+    ('sentinel2', 26380),
+    ('sentinel3', 26381),
 ]
 
 sentinel = Sentinel(SENTINELS, socket_timeout=0.1)
@@ -111,10 +111,10 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://cluster1/0",  
+        "LOCATION": f"redis://{str(REDIS_SENTINEL_MASTER_NAME)}/0",  
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.SentinelClient",
-            "MASTER_NAME": "cluster1", 
+            "MASTER_NAME": f"{str(REDIS_SENTINEL_MASTER_NAME)}", 
             "SENTINELS": SENTINELS,
             "SENTINEL_PASSWORD": None
         }
@@ -127,11 +127,8 @@ CHANNEL_LAYERS = {
         "CONFIG": {
             "hosts": [
                 {
-                    "sentinels": [
-                        ("sentinel1", 26379),
-                        ("sentinel2", 26379),
-                    ],
-                    "master_name": "cluster1", 
+                    "sentinels": SENTINELS,
+                    "master_name": f"{REDIS_SENTINEL_MASTER_NAME}", 
                     "password": None, 
                     "db": 0, 
                 }

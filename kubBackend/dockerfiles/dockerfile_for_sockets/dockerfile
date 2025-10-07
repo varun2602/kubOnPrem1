@@ -7,9 +7,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN apt-get update && apt-get install -y postgresql-client
 
 
-COPY . /app/
+COPY ./kubBackend /app/
 
 COPY ./kubBackend/dockerfiles/dockerfile_for_sockets/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-CMD ["./entrypoint.sh"]
+CMD ["/entrypoint.sh"]

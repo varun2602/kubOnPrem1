@@ -11,7 +11,8 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - kubBackend
+      kubBackend:
+        ipv4_address: 172.21.0.10
 
   django:
     build:
@@ -21,7 +22,6 @@ services:
     depends_on:
       - postgres
       - sentinel1
-      # - sentinel2
     environment:
       - DATABASE_HOST=postgres
       - DATABASE_NAME=kubdb
@@ -29,30 +29,28 @@ services:
       - DATABASE_PASSWORD="1"
     ports:
       - "8000:8000"
-      # - "8001:8001"
     networks:
-      - kubBackend
+      kubBackend:
+         ipv4_address: 172.21.0.11
   
   django-websockets:
     build: 
       context: .
       dockerfile: ./kubBackend/dockerfiles/dockerfile_for_sockets/dockerfile
-    # dockerfile: ./kubBackend/dockerfiles/dockerfile_for_sockets/dockerfile
     container_name: django_container_sockets
     depends_on:
       - postgres
       - sentinel1
-      # - sentinel2
     environment:
       - DATABASE_HOST=postgres
       - DATABASE_NAME=kubdb
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD="1"
     ports:
-      # - "8000:8000"
       - "8001:8001"
     networks:
-      - kubBackend
+      kubBackend:
+       ipv4_address: 172.21.0.12
 
   frontend:
     build: ./my-app
@@ -64,63 +62,132 @@ services:
     depends_on:
       - django
     networks:
-      - kubBackend
-  redis-master:
-    image: redis:7.2
-    container_name: redis-master
-    volumes:
-      - broker-data:/data
-    networks:
-      - kubBackend
-    ports:
-     - "6379:6379"
+      kubBackend:
+        ipv4_address: 172.21.0.13
       
-  redis-slave:
-    image: redis:7.2
-    command: redis-server --port 6380 --slaveof redis-master 6379
-    volumes:
-      - broker-data:/data
-    networks:
-      - kubBackend
+  redis-master:
+    image: redis:latest
+    container_name: redis-master
+    hostname: redis-master
     ports:
-     - "6380:6380"
-    depends_on: 
+      - "6379:6379"
+    volumes:
+      - ./data/master:/data
+    command: redis-server --appendonly yes
+    networks:
+      kubBackend:
+        ipv4_address: 172.21.0.3
+
+
+  redis-slave-1:
+    image: redis:latest
+    container_name: redis-slave-1
+    hostname: redis-slave-1
+    depends_on:
       - redis-master
+    ports:
+      - "6380:6379"
+    volumes:
+      - ./data/slave1:/data
+    command: redis-server --slaveof redis-master 6379 --appendonly yes
+    networks:
+      kubBackend:
+        ipv4_address: 172.21.0.4
+
+
+  redis-slave-2:
+    image: redis:latest
+    container_name: redis-slave-2
+    hostname: redis-slave-2
+    depends_on:
+      - redis-master
+    ports:
+      - "6381:6379"
+    volumes:
+      - ./data/slave2:/data
+    command: redis-server --slaveof redis-master 6379 --appendonly yes
+    networks:
+      kubBackend:
+        ipv4_address: 172.21.0.5
+
+
   sentinel1:
-    image: redis:7.2
-    # CRITICAL FIX: Inline command uses 'redis-master' as the hostname.
-    # We use redis-sentinel binary directly to prevent loading an external config file.
-    command: sh -c "sleep 5 && redis-sentinel --protected-mode no --sentinel monitor master-cluster redis-master 6379 2"
+    image: redis:latest
+    container_name: sentinel1
+    hostname: sentinel1
+    depends_on:
+      - redis-master
     ports:
       - "26379:26379"
-    networks: 
-      - kubBackend
-    volumes:
-      # CRITICAL FIX: Removed the mount to ./kubBackend/sentinel to eliminate the bad config file.
-      - broker-data:/data
-    depends_on: 
-      - redis-master
-      - redis-slave
-      
+    command: >
+      sh -c 'echo "bind 0.0.0.0" > /etc/sentinel.conf &&
+             # FIX: Using internal service name 'redis-master' instead of ${HOST_IP}
+             echo "sentinel monitor mymaster redis-master 6379 2" >> /etc/sentinel.conf &&
+             echo "sentinel resolve-hostnames yes" >> /etc/sentinel.conf &&
+             echo "sentinel down-after-milliseconds mymaster 10000" >> /etc/sentinel.conf &&
+             echo "sentinel failover-timeout mymaster 10000" >> /etc/sentinel.conf &&
+             echo "sentinel parallel-syncs mymaster 1" >> /etc/sentinel.conf &&
+             redis-sentinel /etc/sentinel.conf'
+    networks:
+      kubBackend:
+        ipv4_address: 172.21.0.6
+
+
   sentinel2:
-    image: redis:7.2
-    # CRITICAL FIX: Inline command uses 'redis-master' as the hostname.
-    # We use redis-sentinel binary directly to prevent loading an external config file.
-    command: sh -c "sleep 5 && redis-sentinel --protected-mode no --sentinel monitor master-cluster redis-master 6379 2"
-    ports:
-      - "26380:26380"
-    networks: 
-      - kubBackend
-    volumes:
-      # CRITICAL FIX: Removed the mount to ./kubBackend/sentinel to eliminate the bad config file.
-      - broker-data:/data
-    depends_on: 
+    image: redis:latest
+    container_name: sentinel2
+    hostname: sentinel2
+    depends_on:
       - redis-master
-      - redis-slave
+    ports:
+      - "26380:26379"
+    command: >
+      sh -c 'echo "bind 0.0.0.0" > /etc/sentinel.conf &&
+             # FIX: Using internal service name 'redis-master' instead of ${HOST_IP}
+             echo "sentinel monitor mymaster redis-master 6379 2" >> /etc/sentinel.conf &&
+             echo "sentinel resolve-hostnames yes" >> /etc/sentinel.conf &&
+             echo "sentinel down-after-milliseconds mymaster 10000" >> /etc/sentinel.conf &&
+             echo "sentinel failover-timeout mymaster 10000" >> /etc/sentinel.conf &&
+             echo "sentinel parallel-syncs mymaster 1" >> /etc/sentinel.conf &&
+             redis-sentinel /etc/sentinel.conf'
+    networks:
+      kubBackend:
+        ipv4_address: 172.21.0.7
+
+  sentinel3:
+    image: redis:latest
+    container_name: sentinel3
+    hostname: sentinel3
+    depends_on:
+      - redis-master
+    ports:
+      - "26381:26379"
+    command: >
+      sh -c 'echo "bind 0.0.0.0" > /etc/sentinel.conf &&
+             # FIX: Using internal service name 'redis-master' instead of ${HOST_IP}
+             echo "sentinel monitor mymaster redis-master 6379 2" >> /etc/sentinel.conf &&
+             echo "sentinel resolve-hostnames yes" >> /etc/sentinel.conf &&
+             echo "sentinel down-after-milliseconds mymaster 10000" >> /etc/sentinel.conf &&
+             echo "sentinel failover-timeout mymaster 10000" >> /etc/sentinel.conf &&
+             echo "sentinel parallel-syncs mymaster 1" >> /etc/sentinel.conf &&
+             redis-sentinel /etc/sentinel.conf'
+    networks:
+      kubBackend:
+        ipv4_address: 172.21.0.8
+
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: redisinsight
+    ports:
+      - "5540:5540"
+    networks:
+      kubBackend:
+        ipv4_address: 172.21.0.9
 
 networks:
   kubBackend:
-  
-volumes:
-  broker-data:
-  postgres_data:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
