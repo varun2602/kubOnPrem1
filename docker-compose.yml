@@ -31,7 +31,7 @@ services:
       - "8000:8000"
     networks:
       kubBackend:
-         ipv4_address: 172.21.0.11
+          ipv4_address: 172.21.0.11
   
   django-websockets:
     build: 
@@ -50,10 +50,12 @@ services:
       - "8001:8001"
     networks:
       kubBackend:
-       ipv4_address: 172.21.0.12
+        ipv4_address: 172.21.0.12
 
   frontend:
-    build: ./my-app
+    build:
+      context: ./my-app
+      dockerfile: dockerfile.dev
     container_name: react_app
     ports:
       - "5173:5173"
@@ -66,53 +68,52 @@ services:
         ipv4_address: 172.21.0.13
       
   redis-master:
-    image: redis:latest
+    image: redis:7.2.4-alpine
     container_name: redis-master
     hostname: redis-master
     ports:
       - "6379:6379"
     volumes:
       - ./data/master:/data
-    command: redis-server --appendonly yes
+    # --- FIX: More aggressive 'rm -f' to explicitly target any .rdb files and AOF files, including base RDB files. ---
+    command: sh -c 'rm -f /data/*.rdb /data/appendonly.aof* && redis-server --port 6379'
+    restart: always
     networks:
       kubBackend:
         ipv4_address: 172.21.0.3
 
-
   redis-slave-1:
-    image: redis:latest
+    image: redis:7.2.4-alpine
     container_name: redis-slave-1
     hostname: redis-slave-1
-    depends_on:
-      - redis-master
+    command: sh -c 'rm -f /data/*.rdb /data/appendonly.aof* && redis-server --slaveof redis-master 6379 --save "" --appendonly no'
     ports:
       - "6380:6379"
-    volumes:
-      - ./data/slave1:/data
-    command: redis-server --slaveof redis-master 6379 --appendonly yes
+    # volumes:
+    #   - ./data/slave:/data
     networks:
-      kubBackend:
+      kubBackend: 
         ipv4_address: 172.21.0.4
-
+    depends_on: 
+      - redis-master
 
   redis-slave-2:
-    image: redis:latest
+    image: redis:7.2.4-alpine
     container_name: redis-slave-2
     hostname: redis-slave-2
-    depends_on:
-      - redis-master
+    command: sh -c 'rm -f /data/*.rdb /data/appendonly.aof* && redis-server --slaveof redis-master 6379 --save "" --appendonly no'
     ports:
       - "6381:6379"
-    volumes:
-      - ./data/slave2:/data
-    command: redis-server --slaveof redis-master 6379 --appendonly yes
+    # volumes:
+    #   - ./data/slave:/data
     networks:
-      kubBackend:
+      kubBackend: 
         ipv4_address: 172.21.0.5
-
+    depends_on: 
+      - redis-master
 
   sentinel1:
-    image: redis:latest
+    image: redis:7.2.4-alpine
     container_name: sentinel1
     hostname: sentinel1
     depends_on:
@@ -134,7 +135,7 @@ services:
 
 
   sentinel2:
-    image: redis:latest
+    image: redis:7.2.4-alpine
     container_name: sentinel2
     hostname: sentinel2
     depends_on:
@@ -155,7 +156,7 @@ services:
         ipv4_address: 172.21.0.7
 
   sentinel3:
-    image: redis:latest
+    image: redis:7.2.4-alpine
     container_name: sentinel3
     hostname: sentinel3
     depends_on:

@@ -1,15 +1,24 @@
 FROM python:3.12-slim
 
+# Set working directory
 WORKDIR /app
 
-COPY ./kubBackend/requirements.txt /app/
+# 1. Install system dependencies and cleanup immediately
+# We install postgresql-client here for potential external tool use (psql)
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
+
+# 2. Copy requirements.txt and install Python dependencies
+# This layer only rebuilds if requirements.txt changes.
+COPY kubBackend/requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
-RUN apt-get update && apt-get install -y postgresql-client
 
+# 3. Copy the rest of the application code
+COPY kubBackend /app/
 
-COPY ./kubBackend /app/
+# 4. Set executable permissions and fix Windows line endings
+# We use 'sed' to remove the carriage return (\r) character from the script,
+# which fixes the common "no such file or directory" error on Linux containers.
+RUN chmod +x ./dockerfiles/dockerfile_for_rest/entrypoint.sh && sed -i 's/\r$//' ./dockerfiles/dockerfile_for_rest/entrypoint.sh
 
-COPY ./kubBackend/dockerfiles/dockerfile_for_rest/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-CMD ["/entrypoint.sh"]
+# 5. Define the command to run the entrypoint script using the absolute path
+CMD ["/app/dockerfiles/dockerfile_for_rest/entrypoint.sh"]
