@@ -1,0 +1,6 @@
+https://thelinuxcode.com/kubernetes-projects-for-hands-on-learning-and-practice/
+https://dev.to/eunini/heres-a-step-by-step-guide-for-setting-up-kubernetes-on-an-ec2-instance-3j1n
+
+
+https://dev.to/eunini/heres-a-step-by-step-guide-for-setting-up-kubernetes-on-an-ec2-instance-3j1n
+https://medium.com/@codemass/deploy-your-kubernetes-k8-cluster-on-aws-ec2-a4c4fecfb0bf
